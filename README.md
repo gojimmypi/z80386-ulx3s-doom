@@ -47,6 +47,14 @@ If using a special build of `yosys`, ensure it is in the path:
 export PATH="/mnt/c/workspace/yosys/build-v0.67:$PATH"
 ```
 
+The [patch](./patches/z386/0001-z386-yosys-slang-compat.patch) MUST be applied at this time.
+
+There are pull requests to address each:
+
+- [Fix assignment operator for shift_size z386#2](https://github.com/nand2mario/z386/pull/2)
+- [Introduce Z386_DISABLE_CACHE_RAM_HINTS z386#3](https://github.com/nand2mario/z386/pull/3)
+- [Clear halted register during reset z386#4](https://github.com/nand2mario/z386/pull/4)
+
 ## Initial setup
 
 Extract these files into a new Git repository, then run:

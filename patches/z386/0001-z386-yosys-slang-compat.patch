@@ -62,10 +62,18 @@ index a1a53ce33d707a94974a96b9b92caa98462e7bd7..00af22f1975daa8b7482b2caa109137d
  reg [TAG_BITS-1:0] rd_tag0_r, rd_tag1_r, rd_tag2_r, rd_tag3_r;
  reg rd_valid0_r, rd_valid1_r, rd_valid2_r, rd_valid3_r;
 diff --git a/z386.sv b/z386.sv
-index 9452a6a2024688d658d1b6286a4e663bd03a8ba7..508e33c04e09f0c254717ad94985b5c8a692c05c 100644
+index 9452a6a2024688d658d1b6286a4e663bd03a8ba7..bf78a14226c21b2f8d8a388a8e96ba21ca15e3f1 100644
 --- a/z386.sv
 +++ b/z386.sv
-@@ -4361,7 +4361,7 @@ always_ff @(posedge clk) begin
+@@ -2435,6 +2435,7 @@ always_ff @(posedge clk) begin
+         uc_cond_jump_taken_prev <= 1'b0;
+         stack_init_pending <= 1'b0;
+         dbg_first_done <= 1'b0;
++        halted <= 1'b0;
+         debug_ip <= 32'h0;
+         gate_in_progress <= 1'b0;
+         interrupt_entry <= 1'b0;
+@@ -4361,7 +4362,7 @@ always_ff @(posedge clk) begin
              2'd1:    count_mod = {2'd0, count_raw[3:0]};  // mod 16
              default: count_mod = count_raw;               // mod 32, count is already 0..31
          endcase
