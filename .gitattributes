@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.bit binary
+*.json text eol=lf
+*.config text eol=lf
