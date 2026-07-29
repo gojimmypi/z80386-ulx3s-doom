@@ -27,7 +27,7 @@ jobs:
           - name: ULX3S 85F
             board: ulx3s-85f
             command: make probe
-            bitstream: build/ulx3s/fpga_ulx3s.bit
+            bitstream: build/z386_ulx3s_cpu_probe.bit
 
            # ULX4M-LD support is planned but not yet implemented.
 #          - name: ULX4M-LD 85F
