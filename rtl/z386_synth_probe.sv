@@ -1,17 +1,20 @@
-// CPU-only z386 integration probe for the ULX3S 85F.
+// CPU-only z386 focused shifter regression for the ULX3S 85F.
 //
-// This is deliberately not a PC system yet. It instantiates the complete z386
-// CPU with 1 KiB instruction/data caches and a small synthetic bus target.
+// This instantiates the complete z386 CPU with 1 KiB instruction/data caches
+// and a synthetic ROM/I/O target. FIRE1 (btn[1]) is a dedicated active-high
+// CPU reset: hold it while loading, then release it.
 //
-// FIRE1 (btn[1]) is a dedicated active-high CPU reset. Hold FIRE1 while loading
-// the bitstream, then release it. Reset asserts asynchronously and deasserts
-// synchronously after 16 clocks, so CPU startup does not depend on FPGA register
-// initialization or the ULX3S power button.
+// The 16-bit real-mode ROM tests SHL, SHR, SAR, ROL, ROR, RCL, RCR, SHLD,
+// and SHRD with immediate counts 0, 1, 16, and 17. BSR has no count operand,
+// so it is tested with zero input and highest-set-bit positions 0, 1, 16,
+// and 17. Defined results and flags are checked; SHLD/SHRD count 17 is
+// architecturally undefined, so those cases verify execution and an unrelated
+// canary register only.
 //
-// Before the CPU performs its first output, the LEDs display sticky bring-up
-// status and an FPGA heartbeat. The reset-vector program immediately writes
-// 0xFF to port 0x0080, then jumps to a larger ROM loop that alternates 0x55 and
-// 0xAA slowly enough to see.
+// Before each case, its failure/progress code is written to port 0x0080. If a
+// check fails or an instruction hangs, that code remains on the LEDs. Complete
+// success alternates 0xA5 and 0x5A. The ROM is generated from
+// rom/shift_regression.asm by scripts/build-asm-rom.sh.
 
 module z386_synth_probe #(
     parameter integer DCACHE_SET_BITS = 4,
@@ -60,7 +63,8 @@ logic [31:0] read_address = 32'd0;
 logic  [7:0] read_remaining = 8'd0;
 logic  [7:0] led_output = 8'h00;
 
-// These signals remain visible only until the first successful port-0x80 write.
+// These signals remain visible only until the regression writes its first
+// progress code to port 0x80.
 logic [24:0] heartbeat;
 logic        request_seen = 1'b0;
 logic        response_seen = 1'b0;
@@ -78,53 +82,16 @@ wire  [7:0] cpu_read_length = cpu_io ? 8'd1 :
                                ((cpu_burstcount == 0) ? 8'd1 :
                                                             cpu_burstcount);
 
-// Reset-vector code at physical FFFFFFF0:
-//
-//     mov al, 0xff
-//     out 0x80, al
-//     jmp 0xf000:0x0000
-//
-// The immediate all-LED write happens before the far jump. If the CPU starts
-// but the second ROM region is not reached, the LEDs remain at 0xFF.
-//
-// Slow demo code at physical 000F0000:
-//
-//     cli
-//     mov al, 0x55
-// blink:
-//     out 0x80, al
-//     mov dx, 0x0020
-// outer:
-//     mov cx, 0xffff
-// inner:
-//     loop inner
-//     dec dx
-//     jnz outer
-//     xor al, 0xff
-//     jmp blink
-function automatic [31:0] probe_read_data(input logic [31:0] address);
-    begin
-        case (address)
-            // B0 FF E6 80 EA 00 00 00 F0 90 90 90 90 90 90 90
-            32'hffff_fff0: probe_read_data = 32'h80e6_ffb0;
-            32'hffff_fff4: probe_read_data = 32'h0000_00ea;
-            32'hffff_fff8: probe_read_data = 32'h9090_90f0;
-            32'hffff_fffc: probe_read_data = 32'h9090_9090;
+// The generated ROM maps the reset vector to physical FFFFFFF0 and the focused
+// regression program to physical 000F0000. Only one ROM lookup is required per
+// cycle: an active burst response has priority over a newly accepted request.
+wire [31:0] probe_rom_address = read_active ? read_address : cpu_byte_address;
+wire [31:0] probe_rom_data;
 
-            // FA B0 55 E6 80 BA 20 00 B9 FF FF E2 FE 4A 75 F8
-            // 34 FF EB EF 90 90 90 90
-            32'h000f_0000: probe_read_data = 32'he655_b0fa;
-            32'h000f_0004: probe_read_data = 32'h0020_ba80;
-            32'h000f_0008: probe_read_data = 32'he2ff_ffb9;
-            32'h000f_000c: probe_read_data = 32'hf875_4afe;
-            32'h000f_0010: probe_read_data = 32'hefeb_ff34;
-            32'h000f_0014: probe_read_data = 32'h9090_9090;
-
-            // Unimplemented memory reads return NOP instructions.
-            default:       probe_read_data = 32'h9090_9090;
-        endcase
-    end
-endfunction
+shift_regression_probe_rom probe_rom (
+    .address(probe_rom_address),
+    .data   (probe_rom_data)
+);
 
 // Registered ready/valid responder matching the z386 testbench contract:
 // ready is high while idle, the first read DWORD is returned when the request
@@ -155,7 +122,7 @@ always_ff @(posedge clk_25mhz) begin
             triple_fault_seen <= 1'b1;
 
         if (read_active) begin
-            cpu_din        <= probe_read_data(read_address);
+            cpu_din        <= probe_rom_data;
             cpu_resp_valid <= 1'b1;
             response_seen  <= 1'b1;
             read_address   <= read_address + 32'd4;
@@ -176,7 +143,7 @@ always_ff @(posedge clk_25mhz) begin
                     io_write_seen <= 1'b1;
                 end
             end else begin
-                cpu_din        <= probe_read_data(cpu_byte_address);
+                cpu_din        <= probe_rom_data;
                 cpu_resp_valid <= 1'b1;
                 response_seen  <= 1'b1;
 
@@ -233,12 +200,13 @@ z386 #(
 // Keep the onboard ESP32 from rebooting/reconfiguring the FPGA after JTAG load.
 assign wifi_gpio0 = 1'b1;
 
-// Before the first successful CPU output, expose enough state to prevent
+// Before the first regression progress write, expose enough state to prevent
 // another ambiguous all-dark result:
 //   D7 heartbeat, D6 reset released, D5 triple fault, D4 demo ROM fetched,
 //   D3 reset vector fetched, D2 response returned, D1 request accepted,
 //   D0 FIRE1 held.
-// After the first successful output, all eight LEDs show the x86 port value.
+// After the first progress write, all eight LEDs show the current test code.
+// A static 0x01..0x29 identifies the failing/hung case; alternating A5/5A passes.
 assign led = io_write_seen ? led_output :
              {heartbeat[24], cpu_reset_n, triple_fault_seen, demo_rom_seen,
               reset_vector_seen, response_seen, request_seen, btn[1]};
