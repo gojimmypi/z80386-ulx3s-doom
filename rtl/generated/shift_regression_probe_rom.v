@@ -1,3 +1,5 @@
+`default_nettype none
+
 // Generated file. Do not edit by hand.
 // Source binary: shift_regression.bin
 // Binary SHA-256: 3154845bea9f9eaf750f093da1fe9e23caddd52adf0a849386a33e6f3686d77d
@@ -6,7 +8,7 @@
 //   binary +0x00000000 -> physical 0xfffffff0, 0x10 bytes
 //   binary +0x00010000 -> physical 0x000f0000, to end of binary
 //
-// Source assembly: /mnt/c/workspace/z80386_ULX3S_Doom/rom/shift_regression.asm
+// Source assembly: rom/shift_regression.asm
 //
 // ---- BEGIN SOURCE ASSEMBLY ----
 // | .code16
@@ -692,3 +694,5 @@ endfunction
 assign data = probe_read_data(address);
 
 endmodule
+
+`default_nettype wire

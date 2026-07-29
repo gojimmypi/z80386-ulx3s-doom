@@ -15,6 +15,7 @@
 // check fails or an instruction hangs, that code remains on the LEDs. Complete
 // success alternates 0xA5 and 0x5A. The ROM is generated from
 // rom/shift_regression.asm by scripts/build-asm-rom.sh.
+`default_nettype none
 
 module z386_synth_probe #(
     parameter integer DCACHE_SET_BITS = 4,
@@ -212,3 +213,5 @@ assign led = io_write_seen ? led_output :
               reset_vector_seen, response_seen, request_seen, btn[1]};
 
 endmodule
+
+`default_nettype wire

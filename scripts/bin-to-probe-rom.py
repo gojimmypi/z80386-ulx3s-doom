@@ -143,6 +143,8 @@ def generate_module(
     mappings: list[Mapping],
 ) -> str:
     lines: list[str] = []
+    lines.append("`default_nettype none")
+    lines.append("")
     lines.append("// Generated file. Do not edit by hand.")
     lines.append(f"// Source binary: {binary_name}")
     lines.append(f"// Binary SHA-256: {hashlib.sha256(binary).hexdigest()}")
@@ -196,6 +198,8 @@ def generate_module(
     lines.append(f"assign {data_port} = {function_name}({address_port});")
     lines.append("")
     lines.append("endmodule")
+    lines.append("")
+    lines.append("`default_nettype wire")
     lines.append("")
     return "\n".join(lines)
 
